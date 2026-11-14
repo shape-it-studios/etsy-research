@@ -244,10 +244,10 @@ Reuse an existing subject name whenever one fits, so the same product gets the s
 Listings:
 {json.dumps(items)}"""
         msg = client.messages.create(
-            model=CFG["classifier_model"], max_tokens=4000,
+            model=CFG["classifier_model"], max_tokens=16000,
             messages=[{"role": "user", "content": prompt}],
         )
-        text = msg.content[0].text
+        text = "".join(b.text for b in msg.content if b.type == "text")
         try:
             out = json.loads(text[text.find("["): text.rfind("]") + 1])
         except ValueError:
