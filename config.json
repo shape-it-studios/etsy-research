@@ -1,0 +1,31 @@
+{
+  "own_shop": "ShapeItStudios",
+  "seed_shops": ["ShopBarberellaHome"],
+  "keywords": [
+    "yard art template",
+    "plywood yard art pattern",
+    "trace and cut template",
+    "yard decoration template",
+    "jigsaw pattern yard art",
+    "woodworking pattern outdoor decor",
+    "christmas yard art template",
+    "halloween yard art template",
+    "easter yard art pattern",
+    "4th of july yard art template",
+    "thanksgiving yard art pattern",
+    "valentines yard decoration template",
+    "st patricks day yard art",
+    "nativity scene plywood pattern",
+    "snowman yard art pattern",
+    "garden silhouette yard art pattern"
+  ],
+  "pages_per_keyword": 2,
+  "max_calls_per_run": 4000,
+  "auto_track": {
+    "min_fit_listings": 3,
+    "max_new_per_run": 10,
+    "max_tracked_shops": 150
+  },
+  "classifier_model": "claude-haiku-5-5",
+  "fit_definition": "Shape It Studios sells digital PDF trace-and-cut templates for large outdoor yard art (roughly 2-10ft), printed on tiled pages, traced onto plywood and cut with a jigsaw or router. A listing is a FIT ('yes') if it is a large flat silhouette of one or a few pieces that could be sold as such a template - either a digital pattern/template itself, or a physical finished yard decoration whose subject could be turned into one. 'maybe' if it could work but is unclear (e.g. small size, many intricate parts, painted detail essential). 'no' for anything else (indoor crafts, printables that are not cut patterns, personalised items, clothing, SVG cut files for vinyl machines). licensed_ip is true for sports teams, brands, film/TV/game characters or other trademarks/copyrights."
+}
