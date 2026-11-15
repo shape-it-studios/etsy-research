@@ -9,7 +9,7 @@
 <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.0/dist/umd/supabase.js"></script>
 <script>
-  /* ---------- settings: paste your publishable key below ---------- */
+  /* ---------- settings ---------- */
   const SUPABASE_URL = "https://wyguhrnzugeooopqefuf.supabase.co";
   const SUPABASE_KEY = "sb_publishable_tXIlrutpbYDtGcHD6lAblA_bS0oGrEz"; // sb_publishable_... (safe to publish; the database only answers signed-in, approved users)
 </script>
@@ -86,6 +86,19 @@
   #login button { width: 100%; background: var(--accent); color: #fff; border: 0; border-radius: 6px; padding: 9px; cursor: pointer; font-weight: 500; }
   #login .err { color: var(--accent); min-height: 20px; font-size: 13px; }
 
+  tr.clickable { cursor: pointer; }
+  tr.open td { background: color-mix(in srgb, var(--accent-soft) 45%, transparent); }
+  .caret { display: inline-block; width: 14px; color: var(--muted); }
+  tr.detail td { background: var(--bg); white-space: normal; padding: 14px 12px 18px; }
+  .exgrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 12px; }
+  .excard { display: flex; flex-direction: column; background: var(--panel); border: 1px solid var(--line); border-radius: 8px; overflow: hidden; color: var(--ink); }
+  .excard:hover { border-color: var(--accent); text-decoration: none; }
+  .excard img, .noimg { width: 100%; aspect-ratio: 4 / 3; object-fit: cover; background: var(--dim-soft); display: flex; align-items: center; justify-content: center; color: var(--muted); font-size: 12px; }
+  .exbody { padding: 8px 10px 10px; }
+  .extitle { font-size: 13px; line-height: 1.35; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; margin-bottom: 4px; }
+  .exmeta { font-size: 12px; color: var(--muted); }
+  .exnote { color: var(--muted); font-size: 13px; margin-bottom: 10px; }
+
   #toast { position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%); background: var(--ink); color: var(--bg); padding: 9px 16px; border-radius: 8px; font-size: 13px; opacity: 0; transition: .2s; pointer-events: none; }
   #toast.show { opacity: 1; }
   .hidden { display: none !important; }
@@ -130,7 +143,7 @@
     </section>
 
     <section id="tab-ideas" class="hidden">
-      <p class="intro">Product ideas grouped by theme and subject, from fitting listings across all shops (licensed designs and switched-off shops excluded). <b>Est. sales / 30d</b> needs about a week of daily data; until then, lean on <b>Lifetime est.</b></p>
+      <p class="intro">Product ideas grouped by theme and subject, from fitting listings across all shops (licensed designs and switched-off shops excluded). Click an idea to see its best-selling example listings. <b>Est. sales / 30d</b> needs about a week of daily data; until then, lean on <b>Lifetime est.</b></p>
       <div class="bar">
         <select id="themeFilter"></select>
         <label><input type="checkbox" id="hideOwn"> Hide ideas we already sell</label>
@@ -155,7 +168,10 @@ const state = {
   shops: [], ideas: [],
   shopFilter: "all", shopSort: { key: "lifetime_sales", dir: -1 },
   ideaSort: { key: "est_sales_30d", dir: -1 },
+  expanded: null, examples: {},
 };
+const decode = (s) => { const t = document.createElement("textarea"); t.innerHTML = s ?? ""; return t.value; };
+const ideaKey = (r) => r.theme + "|" + r.subject;
 
 /* ---------- auth ---------- */
 async function boot() {
@@ -308,16 +324,69 @@ function renderIdeas() {
   if (!rows.length) tb.innerHTML = `<tr><td colspan="${cols.length}" class="empty">No ideas match.</td></tr>`;
   for (const r of rows) {
     const share = r.top_shop_share == null ? "—" : `${Math.round(r.top_shop_share * 100)}%<span class="bars"><i style="width:${Math.round(r.top_shop_share * 100)}%"></i></span>`;
+    const key = ideaKey(r), open = state.expanded === key;
     const tr = document.createElement("tr");
+    tr.className = "clickable" + (open ? " open" : "");
+    tr.onclick = () => { state.expanded = open ? null : key; renderIdeas(); if (!open) loadExamples(r); };
     tr.innerHTML = `
-      <td>${esc(r.theme)}</td><td><b>${esc(r.subject)}</b></td>
+      <td>${esc(r.theme)}</td><td><span class="caret">${open ? "▾" : "▸"}</span><b>${esc(r.subject)}</b></td>
       <td class="n">${num(r.est_sales_30d)}</td><td class="n">${money(r.est_revenue_30d_usd, 0)}</td>
       <td class="n">${num(r.lifetime_est_sales)}</td><td class="n">${num(r.listings)}</td><td class="n">${num(r.shops)}</td>
       <td class="n">${money(r.avg_price_usd)}</td><td class="n">${share}</td><td class="n">${num(r.young_listings_selling)}</td>
       <td>${r.we_sell_it ? `<span class="badge b-own">Yes</span>` : ""}</td>`;
     tb.appendChild(tr);
+    if (open) {
+      const d = document.createElement("tr"); d.className = "detail";
+      d.innerHTML = `<td colspan="${cols.length}"><div id="examplesBox">${examplesHTML(key)}</div></td>`;
+      tb.appendChild(d);
+    }
   }
   table.appendChild(tb);
+}
+async function loadExamples(r) {
+  const key = ideaKey(r);
+  if (state.examples[key]) return;
+  state.examples[key] = { loading: true };
+  const { data, error } = await sb.from("idea_examples").select("*")
+    .eq("theme", r.theme).eq("subject", r.subject)
+    .order("est_sales_30d", { ascending: false, nullsFirst: false })
+    .order("lifetime_est_sales", { ascending: false, nullsFirst: false })
+    .order("demand_signal_30d", { ascending: false, nullsFirst: false })
+    .limit(12);
+  if (error) { state.examples[key] = { error: error.message }; return refreshExamples(key); }
+  const ex = state.examples[key] = { rows: data, live: {}, liveLoading: data.length > 0 };
+  refreshExamples(key);
+  if (!data.length) return;
+  try {
+    const res = await sb.functions.invoke("etsy-listings", { body: { ids: data.map((x) => x.listing_id) } });
+    if (res.error || res.data?.error) throw new Error(res.error?.message || res.data.error);
+    for (const l of res.data.listings) ex.live[l.listing_id] = l;
+  } catch (e) { ex.liveError = true; }
+  ex.liveLoading = false;
+  refreshExamples(key);
+}
+function refreshExamples(key) { if (state.expanded === key && $("examplesBox")) $("examplesBox").innerHTML = examplesHTML(key); }
+function examplesHTML(key) {
+  const ex = state.examples[key];
+  if (!ex || ex.loading) return `<div class="exnote">Loading examples…</div>`;
+  if (ex.error) return `<div class="exnote">Couldn't load examples: ${esc(ex.error)}</div>`;
+  if (!ex.rows.length) return `<div class="exnote">No current listings for this idea.</div>`;
+  const cards = ex.rows.map((x) => {
+    const l = ex.live[x.listing_id] || {};
+    const img = l.image ? `<img src="${esc(l.image)}" alt="" loading="lazy">`
+      : `<div class="noimg">${ex.liveLoading ? "Loading photo…" : ex.liveError ? "Photo unavailable" : "No photo"}</div>`;
+    const shop = x.shop_name && !/^shop_\d+$/.test(x.shop_name) ? x.shop_name : "Shop #" + x.shop_id;
+    const price = !x.currency || x.currency === "USD" ? money(x.price) : esc(x.currency) + " " + num(x.price, 2);
+    const sales = x.est_sales_30d != null ? `~${num(x.est_sales_30d)} sales / 30d`
+      : x.lifetime_est_sales != null ? `~${num(x.lifetime_est_sales)} lifetime sales` : "Sales not tracked";
+    const title = l.title ? esc(decode(l.title)) : "Listing #" + x.listing_id;
+    return `<a class="excard" href="https://www.etsy.com/listing/${x.listing_id}" target="_blank" rel="noopener">${img}
+      <div class="exbody"><div class="extitle">${title}</div>
+      <div class="exmeta">${esc(shop)} · ${price}${x.size_ft ? " · " + num(x.size_ft, 1) + "ft" : ""}</div>
+      <div class="exmeta">${sales}</div></div></a>`;
+  }).join("");
+  const note = ex.liveError ? `<div class="exnote">Photos and titles need the etsy-listings function set up in Supabase. Click a card to see it on Etsy.</div>` : "";
+  return note + `<div class="exgrid">${cards}</div>`;
 }
 ["themeFilter", "hideOwn"].forEach((id) => $(id).onchange = renderIdeas);
 $("ideaSearch").oninput = renderIdeas;
