@@ -1,0 +1,404 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex">
+<title>Shape It Research</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.0/dist/umd/supabase.js"></script>
+<script>
+  /* ---------- settings ---------- */
+  const SUPABASE_URL = "https://wyguhrnzugeooopqefuf.supabase.co";
+  const SUPABASE_KEY = "sb_publishable_tXIlrutpbYDtGcHD6lAblA_bS0oGrEz"; // sb_publishable_... (safe to publish; the database only answers signed-in, approved users)
+</script>
+<style>
+  :root {
+    --bg: #f6f4ef; --panel: #ffffff; --ink: #1d1c1a; --muted: #6b675f; --line: #e4e0d6;
+    --accent: #b5532a; --accent-soft: #f6e6dc; --good: #2f6b45; --good-soft: #e1efe5;
+    --warn: #8a6a12; --warn-soft: #f5edd3; --dim-soft: #ecebe7;
+  }
+  @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+    --bg: #161513; --panel: #1f1e1b; --ink: #ece9e2; --muted: #9b968b; --line: #34322d;
+    --accent: #e0835a; --accent-soft: #3a2a21; --good: #7cc495; --good-soft: #1f3327;
+    --warn: #d9b85a; --warn-soft: #362f1b; --dim-soft: #2a2925;
+  } }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--ink); font: 14px/1.45 "IBM Plex Sans", system-ui, sans-serif; }
+  .num, td.n, th.n { font-family: "IBM Plex Mono", ui-monospace, monospace; font-variant-numeric: tabular-nums; }
+  a { color: var(--accent); text-decoration: none; } a:hover { text-decoration: underline; }
+  button, input, select { font: inherit; color: inherit; }
+
+  header { display: flex; align-items: center; gap: 24px; padding: 14px 24px; border-bottom: 1px solid var(--line); background: var(--panel); position: sticky; top: 0; z-index: 5; flex-wrap: wrap; }
+  .brand { font-weight: 600; letter-spacing: -0.01em; }
+  .brand span { color: var(--accent); }
+  nav { display: flex; gap: 4px; }
+  nav button { background: none; border: 0; padding: 6px 12px; border-radius: 6px; cursor: pointer; color: var(--muted); }
+  nav button.on { background: var(--accent-soft); color: var(--accent); font-weight: 500; }
+  .meta { margin-left: auto; color: var(--muted); font-size: 12.5px; display: flex; gap: 14px; align-items: center; }
+  .meta button { background: none; border: 1px solid var(--line); border-radius: 6px; padding: 4px 10px; cursor: pointer; }
+
+  main { padding: 20px 24px 60px; max-width: 1400px; margin: 0 auto; }
+  .intro { color: var(--muted); margin: 0 0 16px; max-width: 760px; }
+  .bar { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin-bottom: 12px; }
+  .chip { border: 1px solid var(--line); background: var(--panel); border-radius: 999px; padding: 5px 12px; cursor: pointer; }
+  .chip.on { border-color: var(--ink); background: var(--ink); color: var(--bg); }
+  .chip .c { opacity: .65; margin-left: 4px; }
+  .bar input[type=search], .bar select { border: 1px solid var(--line); background: var(--panel); border-radius: 6px; padding: 6px 10px; min-width: 200px; }
+  .bar label { display: flex; gap: 6px; align-items: center; color: var(--muted); cursor: pointer; }
+  .spacer { flex: 1; }
+
+  .tablewrap { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; overflow-x: auto; }
+  table { width: 100%; border-collapse: collapse; }
+  th, td { padding: 9px 12px; text-align: left; border-bottom: 1px solid var(--line); vertical-align: top; white-space: nowrap; }
+  td.wrap { white-space: normal; min-width: 180px; max-width: 320px; color: var(--muted); }
+  th { font-size: 12px; font-weight: 500; color: var(--muted); text-transform: uppercase; letter-spacing: .04em; cursor: pointer; user-select: none; position: sticky; top: 0; background: var(--panel); }
+  th.n, td.n { text-align: right; }
+  th .arrow { opacity: .8; }
+  tr:last-child td { border-bottom: 0; }
+  tr.ignored td { opacity: .5; }
+  tr:hover td { background: color-mix(in srgb, var(--accent-soft) 35%, transparent); }
+  .sub { display: block; color: var(--muted); font-size: 12px; }
+  .badge { display: inline-block; font-size: 11.5px; padding: 1px 8px; border-radius: 999px; font-weight: 500; }
+  .b-tracked { background: var(--good-soft); color: var(--good); }
+  .b-candidate { background: var(--warn-soft); color: var(--warn); }
+  .b-ignored { background: var(--dim-soft); color: var(--muted); }
+  .b-own { background: var(--accent-soft); color: var(--accent); }
+
+  .toggle { position: relative; width: 36px; height: 20px; display: inline-block; }
+  .toggle input { opacity: 0; width: 0; height: 0; }
+  .toggle span { position: absolute; inset: 0; background: var(--line); border-radius: 999px; transition: .15s; cursor: pointer; }
+  .toggle span::after { content: ""; position: absolute; width: 14px; height: 14px; left: 3px; top: 3px; background: var(--panel); border-radius: 50%; transition: .15s; box-shadow: 0 1px 2px rgba(0,0,0,.2); }
+  .toggle input:checked + span { background: var(--good); }
+  .toggle input:checked + span::after { transform: translateX(16px); }
+  .toggle input:disabled + span { cursor: not-allowed; opacity: .5; }
+  .toggle input:focus-visible + span { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+  .bars { display: inline-block; width: 60px; height: 6px; background: var(--dim-soft); border-radius: 3px; vertical-align: middle; margin-left: 6px; overflow: hidden; }
+  .bars i { display: block; height: 100%; background: var(--accent); }
+  .empty { padding: 40px; text-align: center; color: var(--muted); }
+
+  #login { max-width: 340px; margin: 12vh auto; background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 28px; }
+  #login h1 { font-size: 18px; margin: 0 0 4px; }
+  #login p { color: var(--muted); margin: 0 0 18px; }
+  #login input { width: 100%; border: 1px solid var(--line); background: var(--bg); border-radius: 6px; padding: 9px 10px; margin-bottom: 10px; }
+  #login button { width: 100%; background: var(--accent); color: #fff; border: 0; border-radius: 6px; padding: 9px; cursor: pointer; font-weight: 500; }
+  #login .err { color: var(--accent); min-height: 20px; font-size: 13px; }
+
+  tr.clickable { cursor: pointer; }
+  tr.open td { background: color-mix(in srgb, var(--accent-soft) 45%, transparent); }
+  .caret { display: inline-block; width: 14px; color: var(--muted); }
+  tr.detail td { background: var(--bg); white-space: normal; padding: 14px 12px 18px; }
+  .exgrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 12px; }
+  .excard { display: flex; flex-direction: column; background: var(--panel); border: 1px solid var(--line); border-radius: 8px; overflow: hidden; color: var(--ink); }
+  .excard:hover { border-color: var(--accent); text-decoration: none; }
+  .excard img, .noimg { width: 100%; aspect-ratio: 4 / 3; object-fit: cover; background: var(--dim-soft); display: flex; align-items: center; justify-content: center; color: var(--muted); font-size: 12px; }
+  .exbody { padding: 8px 10px 10px; }
+  .extitle { font-size: 13px; line-height: 1.35; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; margin-bottom: 4px; }
+  .exmeta { font-size: 12px; color: var(--muted); }
+  .exnote { color: var(--muted); font-size: 13px; margin-bottom: 10px; }
+
+  #toast { position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%); background: var(--ink); color: var(--bg); padding: 9px 16px; border-radius: 8px; font-size: 13px; opacity: 0; transition: .2s; pointer-events: none; }
+  #toast.show { opacity: 1; }
+  .hidden { display: none !important; }
+
+  @media (max-width: 640px) {
+    header, main { padding-left: 16px; padding-right: 16px; }
+    .meta { margin-left: 0; width: 100%; }
+    .bar input[type=search], .bar select { min-width: 0; flex: 1; }
+  }
+</style>
+</head>
+<body>
+
+<form id="login" class="hidden">
+  <h1>Shape It Research</h1>
+  <p>Sign in to see competitor and product data.</p>
+  <input id="email" type="email" placeholder="Email" autocomplete="email" required>
+  <input id="password" type="password" placeholder="Password" autocomplete="current-password" required>
+  <div class="err" id="loginErr"></div>
+  <button type="submit">Sign in</button>
+</form>
+
+<div id="app" class="hidden">
+  <header>
+    <div class="brand">Shape It <span>Research</span></div>
+    <nav>
+      <button data-tab="shops" class="on">Competitors</button>
+      <button data-tab="ideas">Product ideas</button>
+    </nav>
+    <div class="meta"><span id="updated">Loading…</span><button id="signout">Sign out</button></div>
+  </header>
+
+  <main>
+    <section id="tab-shops">
+      <p class="intro">Every shop the daily searches have found selling yard-art style products. Switch a shop on to track it (its full catalogue, sales and reviews are pulled each morning). Switch it off to drop it from tracking and from the product ideas. Changes apply from the next morning's run.</p>
+      <div class="bar">
+        <div id="statusChips" style="display:flex;gap:6px;flex-wrap:wrap"></div>
+        <div class="spacer"></div>
+        <input type="search" id="shopSearch" placeholder="Search shops or subjects">
+      </div>
+      <div class="tablewrap"><table id="shopTable"></table></div>
+    </section>
+
+    <section id="tab-ideas" class="hidden">
+      <p class="intro">Product ideas grouped by theme and subject, from fitting listings across all shops (licensed designs and switched-off shops excluded). Click an idea to see its best-selling example listings. <b>Est. sales / 30d</b> needs about a week of daily data; until then, lean on <b>Lifetime est.</b></p>
+      <div class="bar">
+        <select id="themeFilter"></select>
+        <label><input type="checkbox" id="hideOwn"> Hide ideas we already sell</label>
+        <div class="spacer"></div>
+        <input type="search" id="ideaSearch" placeholder="Search subjects">
+      </div>
+      <div class="tablewrap"><table id="ideaTable"></table></div>
+    </section>
+  </main>
+</div>
+<div id="toast"></div>
+
+<script>
+const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+const $ = (id) => document.getElementById(id);
+const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+const num = (v, d = 0) => v == null ? "—" : Number(v).toLocaleString(undefined, { maximumFractionDigits: d, minimumFractionDigits: d });
+const money = (v, d = 2) => v == null ? "—" : "$" + num(v, d);
+function toast(msg) { const t = $("toast"); t.textContent = msg; t.classList.add("show"); clearTimeout(t._h); t._h = setTimeout(() => t.classList.remove("show"), 2600); }
+
+const state = {
+  shops: [], ideas: [],
+  shopFilter: "all", shopSort: { key: "lifetime_sales", dir: -1 },
+  ideaSort: { key: "est_sales_30d", dir: -1 },
+  expanded: null, examples: {},
+};
+const decode = (s) => { const t = document.createElement("textarea"); t.innerHTML = s ?? ""; return t.value; };
+const ideaKey = (r) => r.theme + "|" + r.subject;
+
+/* ---------- auth ---------- */
+async function boot() {
+  const { data } = await sb.auth.getSession();
+  data.session ? showApp() : showLogin();
+}
+function showLogin() { $("app").classList.add("hidden"); $("login").classList.remove("hidden"); }
+function showApp() { $("login").classList.add("hidden"); $("app").classList.remove("hidden"); load(); }
+$("login").addEventListener("submit", async (e) => {
+  e.preventDefault(); $("loginErr").textContent = "";
+  const { error } = await sb.auth.signInWithPassword({ email: $("email").value.trim(), password: $("password").value });
+  error ? ($("loginErr").textContent = error.message) : showApp();
+});
+$("signout").onclick = async () => { await sb.auth.signOut(); showLogin(); };
+
+/* ---------- data ---------- */
+async function load() {
+  const [shops, ideas, last] = await Promise.all([
+    sb.from("shop_overview").select("*"),
+    sb.from("concept_scores").select("*"),
+    sb.from("shop_snapshots").select("snap_date").order("snap_date", { ascending: false }).limit(1),
+  ]);
+  const err = shops.error || ideas.error || last.error;
+  if (err) { $("updated").textContent = "Couldn't load data"; toast(err.message); return; }
+  state.shops = shops.data; state.ideas = ideas.data;
+  if (!state.shops.length && !state.ideas.length) toast("No data visible. Is your email in allowed_users?");
+  $("updated").textContent = last.data[0] ? "Data as of " + new Date(last.data[0].snap_date + "T12:00").toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" }) : "No snapshots yet";
+  const themes = [...new Set(state.ideas.map((r) => r.theme).filter(Boolean))].sort();
+  $("themeFilter").innerHTML = `<option value="">All themes</option>` + themes.map((t) => `<option>${esc(t)}</option>`).join("");
+  renderShops(); renderIdeas();
+}
+
+/* ---------- generic sortable table ---------- */
+function sortRows(rows, { key, dir }) {
+  return [...rows].sort((a, b) => {
+    const x = a[key], y = b[key];
+    if (x == null && y == null) return 0; if (x == null) return 1; if (y == null) return -1;
+    return (typeof x === "number" && typeof y === "number" ? x - y : String(x).localeCompare(String(y))) * dir;
+  });
+}
+function head(cols, sort, onSort) {
+  const tr = document.createElement("tr");
+  for (const c of cols) {
+    const th = document.createElement("th");
+    if (c.n) th.className = "n";
+    th.innerHTML = esc(c.label) + (c.key && sort.key === c.key ? ` <span class="arrow">${sort.dir > 0 ? "↑" : "↓"}</span>` : "");
+    if (c.title) th.title = c.title;
+    if (c.key) th.onclick = () => onSort(c.key);
+    else th.style.cursor = "default";
+    tr.appendChild(th);
+  }
+  const thead = document.createElement("thead"); thead.appendChild(tr); return thead;
+}
+function setSort(sort, key) { sort.dir = sort.key === key ? -sort.dir : (key === "shop_name" || key === "subject" || key === "theme" ? 1 : -1); sort.key = key; }
+
+/* ---------- competitors ---------- */
+const STATUS_ORDER = { tracked: 0, candidate: 1, ignored: 2 };
+function shopName(r) { return r.shop_name && !/^shop_\d+$/.test(r.shop_name) ? r.shop_name : null; }
+
+function renderShops() {
+  const counts = { all: state.shops.length, tracked: 0, candidate: 0, ignored: 0 };
+  state.shops.forEach((r) => counts[r.status]++);
+  const labels = { all: "All", tracked: "Tracked", candidate: "Candidates", ignored: "Switched off" };
+  $("statusChips").innerHTML = Object.keys(labels).map((k) =>
+    `<button class="chip ${state.shopFilter === k ? "on" : ""}" data-f="${k}">${labels[k]}<span class="c">${counts[k]}</span></button>`).join("");
+  $("statusChips").querySelectorAll("button").forEach((b) => b.onclick = () => { state.shopFilter = b.dataset.f; renderShops(); });
+
+  const q = $("shopSearch").value.trim().toLowerCase();
+  let rows = state.shops.filter((r) => state.shopFilter === "all" || r.status === state.shopFilter);
+  if (q) rows = rows.filter((r) => (shopName(r) || "").toLowerCase().includes(q) || (r.top_subjects || "").toLowerCase().includes(q));
+  rows = sortRows(rows, state.shopSort);
+
+  const cols = [
+    { label: "Track" },
+    { label: "Shop", key: "shop_name" },
+    { label: "Status", key: "status" },
+    { label: "Sales / 30d", key: "sales_30d", n: 1, title: "Real Etsy sales, scaled to 30 days from the days tracked so far" },
+    { label: "Lifetime sales", key: "lifetime_sales", n: 1 },
+    { label: "Fitting listings", key: "yes_listings", n: 1, title: "Listings the classifier rated a fit (+ maybes)" },
+    { label: "Avg price", key: "avg_price", n: 1 },
+    { label: "Main subjects", key: "top_subjects" },
+    { label: "In searches", key: "keywords", n: 1, title: "How many of the 16 keyword searches it appeared in this week (best rank)" },
+    { label: "First seen", key: "first_seen" },
+  ];
+  const table = $("shopTable"); table.innerHTML = "";
+  table.appendChild(head(cols, state.shopSort, (k) => { setSort(state.shopSort, k); renderShops(); }));
+  const tb = document.createElement("tbody");
+  if (!rows.length) tb.innerHTML = `<tr><td colspan="${cols.length}" class="empty">No shops here yet.</td></tr>`;
+  for (const r of rows) {
+    const name = shopName(r);
+    const shopCell = name
+      ? `<a href="https://www.etsy.com/shop/${encodeURIComponent(name)}" target="_blank" rel="noopener">${esc(name)}</a>`
+      : `Shop #${r.shop_id}` + (r.sample_listing_id ? `<span class="sub"><a href="https://www.etsy.com/listing/${r.sample_listing_id}" target="_blank" rel="noopener">see a listing</a> · name fills in once tracked</span>` : "");
+    const badge = r.is_own ? `<span class="badge b-own">Your shop</span>`
+      : `<span class="badge b-${r.status}">${{ tracked: "Tracked", candidate: "Candidate", ignored: "Switched off" }[r.status]}</span>`;
+    const tr = document.createElement("tr"); if (r.status === "ignored") tr.className = "ignored";
+    tr.innerHTML = `
+      <td><label class="toggle" title="${r.is_own ? "Your shop is always tracked" : "Track this shop"}"><input type="checkbox" ${r.status === "tracked" ? "checked" : ""} ${r.is_own ? "disabled" : ""} aria-label="Track ${esc(name || "shop " + r.shop_id)}"><span></span></label></td>
+      <td>${shopCell}</td>
+      <td>${badge}</td>
+      <td class="n">${num(r.sales_30d)}${r.sales_days != null && r.sales_days < 7 ? `<span class="sub">${r.sales_days}d of data</span>` : ""}</td>
+      <td class="n">${num(r.lifetime_sales)}</td>
+      <td class="n">${num(r.yes_listings)}${r.maybe_listings ? `<span class="sub">+${r.maybe_listings} maybe</span>` : ""}${r.ip_listings ? `<span class="sub">${r.ip_listings} licensed</span>` : ""}</td>
+      <td class="n">${money(r.avg_price)}</td>
+      <td class="wrap">${esc(r.top_subjects || "—")}</td>
+      <td class="n">${num(r.keywords)}${r.best_rank ? `<span class="sub">best #${r.best_rank}</span>` : ""}</td>
+      <td class="num">${r.first_seen ? esc(r.first_seen) : "—"}</td>`;
+    tr.querySelector("input").onchange = (e) => setTracked(r, e.target.checked, e.target);
+    tb.appendChild(tr);
+  }
+  table.appendChild(tb);
+}
+
+async function setTracked(r, on, input) {
+  input.disabled = true;
+  let res;
+  if (r.status === "candidate") {
+    res = await sb.from("shops").insert({ shop_id: r.shop_id, shop_name: "shop_" + r.shop_id, tracked: true, source: "dashboard" });
+  } else {
+    res = await sb.from("shops").update({ tracked: on }).eq("shop_id", r.shop_id);
+  }
+  input.disabled = false;
+  if (res.error) { input.checked = !on; toast("Couldn't save: " + res.error.message); return; }
+  r.status = on ? "tracked" : "ignored";
+  if (!r.source) { r.source = "dashboard"; r.first_seen = new Date().toISOString().slice(0, 10); }
+  toast(on ? "Tracking from tomorrow's run" : "Switched off. Excluded from tomorrow's run and product ideas");
+  renderShops();
+}
+$("shopSearch").oninput = renderShops;
+
+/* ---------- product ideas ---------- */
+function renderIdeas() {
+  const theme = $("themeFilter").value, hideOwn = $("hideOwn").checked, q = $("ideaSearch").value.trim().toLowerCase();
+  let rows = state.ideas.filter((r) => (!theme || r.theme === theme) && (!hideOwn || !r.we_sell_it) && (!q || (r.subject || "").toLowerCase().includes(q)));
+  rows = sortRows(rows, state.ideaSort);
+  const cols = [
+    { label: "Theme", key: "theme" }, { label: "Subject", key: "subject" },
+    { label: "Est. sales / 30d", key: "est_sales_30d", n: 1 },
+    { label: "Est. revenue / 30d", key: "est_revenue_30d_usd", n: 1 },
+    { label: "Lifetime est.", key: "lifetime_est_sales", n: 1, title: "Lifetime sales split by review share. Rough; favours older listings" },
+    { label: "Listings", key: "listings", n: 1 }, { label: "Shops", key: "shops", n: 1 },
+    { label: "Avg price", key: "avg_price_usd", n: 1 },
+    { label: "Top shop share", key: "top_shop_share", n: 1, title: "Share of demand held by the biggest shop. Lower = easier to break into" },
+    { label: "New & selling", key: "young_listings_selling", n: 1, title: "Listings under 6 months old already selling" },
+    { label: "We sell it", key: "we_sell_it" },
+  ];
+  const table = $("ideaTable"); table.innerHTML = "";
+  table.appendChild(head(cols, state.ideaSort, (k) => { setSort(state.ideaSort, k); renderIdeas(); }));
+  const tb = document.createElement("tbody");
+  if (!rows.length) tb.innerHTML = `<tr><td colspan="${cols.length}" class="empty">No ideas match.</td></tr>`;
+  for (const r of rows) {
+    const share = r.top_shop_share == null ? "—" : `${Math.round(r.top_shop_share * 100)}%<span class="bars"><i style="width:${Math.round(r.top_shop_share * 100)}%"></i></span>`;
+    const key = ideaKey(r), open = state.expanded === key;
+    const tr = document.createElement("tr");
+    tr.className = "clickable" + (open ? " open" : "");
+    tr.onclick = () => { state.expanded = open ? null : key; renderIdeas(); if (!open) loadExamples(r); };
+    tr.innerHTML = `
+      <td>${esc(r.theme)}</td><td><span class="caret">${open ? "▾" : "▸"}</span><b>${esc(r.subject)}</b></td>
+      <td class="n">${num(r.est_sales_30d)}</td><td class="n">${money(r.est_revenue_30d_usd, 0)}</td>
+      <td class="n">${num(r.lifetime_est_sales)}</td><td class="n">${num(r.listings)}</td><td class="n">${num(r.shops)}</td>
+      <td class="n">${money(r.avg_price_usd)}</td><td class="n">${share}</td><td class="n">${num(r.young_listings_selling)}</td>
+      <td>${r.we_sell_it ? `<span class="badge b-own">Yes</span>` : ""}</td>`;
+    tb.appendChild(tr);
+    if (open) {
+      const d = document.createElement("tr"); d.className = "detail";
+      d.innerHTML = `<td colspan="${cols.length}"><div id="examplesBox">${examplesHTML(key)}</div></td>`;
+      tb.appendChild(d);
+    }
+  }
+  table.appendChild(tb);
+}
+async function loadExamples(r) {
+  const key = ideaKey(r);
+  if (state.examples[key]) return;
+  state.examples[key] = { loading: true };
+  const { data, error } = await sb.from("idea_examples").select("*")
+    .eq("theme", r.theme).eq("subject", r.subject)
+    .order("est_sales_30d", { ascending: false, nullsFirst: false })
+    .order("lifetime_est_sales", { ascending: false, nullsFirst: false })
+    .order("demand_signal_30d", { ascending: false, nullsFirst: false })
+    .limit(12);
+  if (error) { state.examples[key] = { error: error.message }; return refreshExamples(key); }
+  const ex = state.examples[key] = { rows: data, live: {}, liveLoading: data.length > 0 };
+  refreshExamples(key);
+  if (!data.length) return;
+  try {
+    const res = await sb.functions.invoke("etsy-listings", { body: { ids: data.map((x) => x.listing_id) } });
+    if (res.error || res.data?.error) throw new Error(res.error?.message || res.data.error);
+    for (const l of res.data.listings) ex.live[l.listing_id] = l;
+  } catch (e) { ex.liveError = true; }
+  ex.liveLoading = false;
+  refreshExamples(key);
+}
+function refreshExamples(key) { if (state.expanded === key && $("examplesBox")) $("examplesBox").innerHTML = examplesHTML(key); }
+function examplesHTML(key) {
+  const ex = state.examples[key];
+  if (!ex || ex.loading) return `<div class="exnote">Loading examples…</div>`;
+  if (ex.error) return `<div class="exnote">Couldn't load examples: ${esc(ex.error)}</div>`;
+  if (!ex.rows.length) return `<div class="exnote">No current listings for this idea.</div>`;
+  const cards = ex.rows.map((x) => {
+    const l = ex.live[x.listing_id] || {};
+    const img = l.image ? `<img src="${esc(l.image)}" alt="" loading="lazy">`
+      : `<div class="noimg">${ex.liveLoading ? "Loading photo…" : ex.liveError ? "Photo unavailable" : "No photo"}</div>`;
+    const shop = x.shop_name && !/^shop_\d+$/.test(x.shop_name) ? x.shop_name : "Shop #" + x.shop_id;
+    const price = !x.currency || x.currency === "USD" ? money(x.price) : esc(x.currency) + " " + num(x.price, 2);
+    const sales = x.est_sales_30d != null ? `~${num(x.est_sales_30d)} sales / 30d`
+      : x.lifetime_est_sales != null ? `~${num(x.lifetime_est_sales)} lifetime sales` : "Sales not tracked";
+    const title = l.title ? esc(decode(l.title)) : "Listing #" + x.listing_id;
+    return `<a class="excard" href="https://www.etsy.com/listing/${x.listing_id}" target="_blank" rel="noopener">${img}
+      <div class="exbody"><div class="extitle">${title}</div>
+      <div class="exmeta">${esc(shop)} · ${price}${x.size_ft ? " · " + num(x.size_ft, 1) + "ft" : ""}</div>
+      <div class="exmeta">${sales}</div></div></a>`;
+  }).join("");
+  const note = ex.liveError ? `<div class="exnote">Photos and titles need the etsy-listings function set up in Supabase. Click a card to see it on Etsy.</div>` : "";
+  return note + `<div class="exgrid">${cards}</div>`;
+}
+["themeFilter", "hideOwn"].forEach((id) => $(id).onchange = renderIdeas);
+$("ideaSearch").oninput = renderIdeas;
+
+/* ---------- tabs ---------- */
+document.querySelectorAll("nav button").forEach((b) => b.onclick = () => {
+  document.querySelectorAll("nav button").forEach((x) => x.classList.toggle("on", x === b));
+  $("tab-shops").classList.toggle("hidden", b.dataset.tab !== "shops");
+  $("tab-ideas").classList.toggle("hidden", b.dataset.tab !== "ideas");
+});
+
+boot();
+</script>
+</body>
+</html>
