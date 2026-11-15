@@ -174,6 +174,9 @@ def snapshot_shop(conn, etsy, shop_id):
         conn.execute("update shops set tracked = false where shop_id = %s", (shop_id,))
         conn.commit()
         return
+    # Shops added from the dashboard start with a placeholder name; fix it here.
+    conn.execute("update shops set shop_name = %s where shop_id = %s and shop_name <> %s",
+                 (s["shop_name"], shop_id, s["shop_name"]))
     conn.execute(
         """insert into shop_snapshots values (%s,%s,%s,%s,%s,%s,%s)
            on conflict (shop_id, snap_date) do update set
